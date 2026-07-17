@@ -48,7 +48,7 @@ export default function Home() {
             </h2>
             <p className="mt-3 text-white">
               Spots are limited and registrations are reviewed in the order
-              they arrive. Reserve your seat now — it&apos;s free.
+              they arrive. Reserve your seat now — registration fee Rs. 500.
             </p>
             <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a

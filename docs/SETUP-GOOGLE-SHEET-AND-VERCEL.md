@@ -25,6 +25,12 @@ In Google Sheets, go to **Extensions → Apps Script**. A new tab opens with a c
 
 ### Step 3 — Paste this code (replace the default `Code.gs` content)
 
+> **IMPORTANT — read the note below the code block.** The Apps Script is the
+> single source of truth for the registration ID (SNO). It computes SNO from
+> the Sheet's last row, so every submission gets a unique, sequential ID even
+> when the app is hosted on Vercel (where the local database resets on every
+> cold start).
+
 ```javascript
 function doPost(e) {
   try {
@@ -32,8 +38,16 @@ function doPost(e) {
 
     // Read fields sent from the Next.js app
     var p = e.parameter;
+
+    // Compute SNO from the Sheet's last row.
+    // - Header row is row 1, so the first data row is row 2 → SNO = 1.
+    // - This is the ONLY reliable source of SNO. The Next.js app does NOT
+    //   compute SNO on its own because its database is ephemeral on Vercel.
+    var lastRow = sheet.getLastRow();
+    var sno = Math.max(0, lastRow); // lastRow=1 (header) → sno=1 for first entry
+
     var row = [
-      p.SNO,
+      sno,
       p.Name,
       p.Gender,
       p.Age,
@@ -46,8 +60,9 @@ function doPost(e) {
 
     sheet.appendRow(row);
 
+    // Return the assigned SNO so the Next.js app can show it to the user.
     return ContentService
-      .createTextOutput(JSON.stringify({ ok: true }))
+      .createTextOutput(JSON.stringify({ ok: true, sno: sno }))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService
@@ -55,7 +70,21 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
+
+// Optional but recommended: a simple doGet so you can test the Web App URL
+// in your browser. Visiting it should return {"ok":true,"ping":true}.
+function doGet() {
+  return ContentService
+    .createTextOutput(JSON.stringify({ ok: true, ping: true }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
 ```
+
+> **If you already deployed an earlier version of the script** (without the
+> SNO computation), you must:
+> 1. Replace the code with the version above.
+> 2. Click **Deploy → Manage deployments → Edit (pencil icon) → Version: New version → Deploy**.
+> 3. The Web App URL stays the same — no need to update Vercel.
 
 ### Step 4 — Deploy as a Web App
 
@@ -145,7 +174,34 @@ If a submission doesn't appear in the Sheet:
 
 ## 4. Updating the Sheet columns
 
-If you ever change the Sheet columns (add/remove), also update the `row` array in the Apps Script `doPost` function so the indices match. The portal always sends: `SNO, Name, Gender, Age, Class, WhatsApp, JKName, School`.
+If you ever change the Sheet columns (add/remove), also update the `row` array in the Apps Script `doPost` function so the indices match. The portal always sends: `Name, Gender, Age, Class, WhatsApp, JKName, School` (SNO is computed by the Apps Script itself — don't send it from the app).
+
+---
+
+## 5. Troubleshooting
+
+### "Every submission gets the same ID (e.g. #001)"
+
+This happens when the Next.js app tries to compute the ID itself, but its database is ephemeral on Vercel (the serverless filesystem resets on every cold start). **Fix:** make sure the Apps Script in your Google Sheet is the version above that computes `sno` from `sheet.getLastRow()` and returns `{ ok: true, sno: <number> }`. If you previously deployed an older version of the script, replace it and create a new deployment version (Deploy → Manage deployments → Edit → New version).
+
+### "I submit but nothing appears in the Sheet"
+
+1. Look at the badge next to "Registration is open" in the form — it tells you whether the Sheet is connected and reachable:
+   - 🟢 **Sheet connected** — the Apps Script responded to a ping
+   - 🟠 **Sheet not connected** — `GOOGLE_SCRIPT_URL` is missing on Vercel
+   - 🔴 **Sheet reachable? No** — the URL is set but the Apps Script didn't respond (wrong URL, or the script throws an error)
+2. Submit a test registration. The success screen will tell you whether the row actually reached the Sheet ("You're registered!") or only landed in the local backup ("Saved — but action needed").
+3. Check the Vercel function logs (Vercel dashboard → your project → Logs) — the API prints the upstream status and response body when the Apps Script fails.
+
+### "The Apps Script response was not valid JSON"
+
+This means the script ran but didn't return the expected `{ ok: true, sno: <number> }` JSON. Make sure you copied the full `doPost` function from Step 3 above, including the `ContentService.createTextOutput(JSON.stringify(...))` line.
+
+### "I want to test the connection without submitting a form"
+
+Visit your Web App URL in a browser — it should return `{"ok":true,"ping":true}` (the `doGet` handler). If you see HTML instead, the script wasn't deployed as a Web App, or `doGet` is missing.
+
+You can also hit the status endpoint directly: `https://<your-vercel-url>/api/register/status` — it returns JSON with `configured`, `reachable`, and a human-readable `detail`.
 
 ---
 
@@ -158,5 +214,6 @@ If you ever change the Sheet columns (add/remove), also update the `row` array i
 | Apps Script | `https://script.google.com/home` |
 | Vercel dashboard | `https://vercel.com/dashboard` |
 | Repo | `https://github.com/<your-username>/akleb-ai-camp` |
+| Status check | `https://<your-vercel-url>/api/register/status` |
 
 Built with Next.js 16, TypeScript, Tailwind CSS, and shadcn/ui.

@@ -70,21 +70,33 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Compute SNO — next serial in local DB (matches Sheet SNO if Sheet is empty initially)
-  let sno = 1;
-  try {
-    const count = await db.registration.count();
-    sno = count + 1;
-  } catch {
-    // DB not ready; non-fatal
-  }
+  // ---------------------------------------------------------------------------
+  // SNO strategy
+  // ---------------------------------------------------------------------------
+  // The Google Sheet is the single source of truth for SNO. The Apps Script
+  // computes SNO = lastRow (so the first data row gets SNO=1) when it appends
+  // the row, and returns it as JSON in its response.
+  //
+  // We do NOT compute SNO from the local DB count — on Vercel the serverless
+  // filesystem is ephemeral, so the SQLite file resets on every cold start
+  // and `count() + 1` would always return 1. That was the "same ID for
+  // everyone" bug.
+  //
+  // If the Sheet is not reachable, we fall back to a timestamp-based
+  // temporary ID so the user still sees something unique. The real SNO will
+  // be assigned by the Sheet once the connection is restored.
+  // ---------------------------------------------------------------------------
 
-  // 1) Backup to local DB
+  let sno: number | null = null;
+  let snoSource: "sheet" | "fallback" | null = null;
+
+  // 1) Backup to local DB (still useful in dev; on Vercel it's ephemeral but
+  //    harmless). SNO is filled in after we hear back from the Sheet.
   let localSaved = false;
   try {
     await db.registration.create({
       data: {
-        sno,
+        sno: 0, // placeholder; updated below if we get a real SNO from Sheet
         name,
         gender,
         age: ageNum,
@@ -101,13 +113,18 @@ export async function POST(req: NextRequest) {
 
   // 2) Forward to Google Apps Script Web App (Google Sheets integration)
   let googleSheet = false;
+  let sheetDetail: string | undefined;
   const scriptUrl = process.env.GOOGLE_SCRIPT_URL;
-  if (scriptUrl) {
+  if (!scriptUrl) {
+    sheetDetail =
+      "GOOGLE_SCRIPT_URL is not set — submission was saved to local DB only.";
+  } else {
     try {
       // Apps Script Web Apps accept form-encoded payloads and read fields
       // via `e.parameter.<field>` inside `doPost(e)`.
+      // Note: we do NOT send SNO — the Apps Script computes it from the
+      // Sheet's last row, which is the only reliable source of truth.
       const params = new URLSearchParams();
-      params.set("SNO", String(sno));
       params.set("Name", name);
       params.set("Gender", gender);
       params.set("Age", String(ageNum));
@@ -129,16 +146,42 @@ export async function POST(req: NextRequest) {
 
       if (upstream.ok) {
         googleSheet = true;
+        // Try to parse the SNO from the Apps Script's JSON response.
+        const text = await upstream.text().catch(() => "");
+        try {
+          const json = JSON.parse(text);
+          if (typeof json.sno === "number" && json.sno > 0) {
+            sno = json.sno;
+            snoSource = "sheet";
+            sheetDetail = `Row #${sno} appended to Google Sheet successfully.`;
+          } else if (json.ok === true) {
+            sheetDetail =
+              "Row appended to Google Sheet, but the script did not return an SNO. Update the Apps Script to return { ok: true, sno: <number> } so the UI can show the real ID.";
+          } else {
+            sheetDetail = `Row appended, but the Apps Script response was unexpected: ${text.slice(0, 200)}`;
+          }
+        } catch {
+          sheetDetail = `Row appended, but the Apps Script response was not valid JSON: ${text.slice(0, 200)}`;
+        }
       } else {
-        console.error(
-          "[register] Google Apps Script returned",
-          upstream.status,
-          await upstream.text().catch(() => "")
-        );
+        const bodyText = await upstream.text().catch(() => "");
+        sheetDetail = `Apps Script returned HTTP ${upstream.status}. Body: ${bodyText.slice(0, 300)}`;
+        console.error("[register] Google Apps Script returned", upstream.status, bodyText);
       }
     } catch (err) {
+      sheetDetail = `Could not reach Google Apps Script: ${
+        err instanceof Error ? err.message : String(err)
+      }`;
       console.error("[register] Google Apps Script forward failed:", err);
     }
+  }
+
+  // 3) Fallback SNO if the Sheet didn't return one.
+  //    Use a timestamp-based ID (seconds since epoch, last 6 digits) so
+  //    submissions are still distinguishable when the Sheet is down.
+  if (sno === null) {
+    sno = Number(Date.now().toString().slice(-6));
+    snoSource = "fallback";
   }
 
   if (!localSaved && !googleSheet) {
@@ -147,6 +190,7 @@ export async function POST(req: NextRequest) {
         ok: false,
         error:
           "We could not save your registration. Please try again or contact the organizer.",
+        sheetDetail,
       },
       { status: 500 }
     );
@@ -155,21 +199,28 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     sno,
+    snoSource,
     googleSheet,
     localSaved,
+    sheetDetail,
     warning:
       googleSheet && !localSaved
         ? undefined
         : !googleSheet && localSaved
-        ? "Saved locally. The organizer has not connected the live Google Sheet yet — your registration is still recorded."
+        ? "Saved locally. The Google Sheet is NOT connected — your registration is in the backup DB and will appear in the Sheet once GOOGLE_SCRIPT_URL is set."
         : undefined,
   });
 }
 
 export async function GET() {
+  const scriptUrl = process.env.GOOGLE_SCRIPT_URL;
   return NextResponse.json({
     ok: true,
     message: "AKLEB STEM & Robotics registration endpoint is live.",
-    googleSheetConfigured: Boolean(process.env.GOOGLE_SCRIPT_URL),
+    googleSheetConfigured: Boolean(scriptUrl),
+    googleSheetUrl: scriptUrl
+      ? `${new URL(scriptUrl).origin}/macros/s/****/exec`
+      : null,
+    statusEndpoint: "/api/register/status",
   });
 }

@@ -54,7 +54,7 @@ export function Hero() {
                 asChild
                 className="bg-amber-400 text-amber-950 hover:bg-amber-300"
               >
-                <a href="#register">Register Now — Free</a>
+                <a href="#register">Register Now — Rs. 500</a>
               </Button>
               <Button
                 size="lg"
