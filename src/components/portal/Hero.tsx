@@ -75,7 +75,11 @@ export function Hero() {
               </span>
               <span className="inline-flex items-center gap-2">
                 <CalendarDays className="h-4 w-4 text-amber-300" />
+<<<<<<< HEAD
                 Starts 25 July · 12:00 PM
+=======
+                5 sessions · 2 hours each
+>>>>>>> a5a7e01694ee185bfa01efef2f0230eb233ff9cd
               </span>
               <span className="inline-flex items-center gap-2">
                 <Cpu className="h-4 w-4 text-amber-300" />

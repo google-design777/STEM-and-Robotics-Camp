@@ -1,6 +1,10 @@
 "use client";
 
+<<<<<<< HEAD
 import { Cpu, MapPin, CalendarDays, Users, Sparkles } from "lucide-react";
+=======
+import { Cpu, MapPin, CalendarDays, Users, Code } from "lucide-react";
+>>>>>>> a5a7e01694ee185bfa01efef2f0230eb233ff9cd
 
 export function Footer() {
   return (
@@ -42,9 +46,13 @@ export function Footer() {
               </li>
               <li className="flex items-start gap-2">
                 <CalendarDays className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+<<<<<<< HEAD
                 <span>
                   Session 1: 25 July · Session 2: 26 July · 12:00 PM
                 </span>
+=======
+                <span>5 sessions · 2 hours each · 10 hours total</span>
+>>>>>>> a5a7e01694ee185bfa01efef2f0230eb233ff9cd
               </li>
             </ul>
           </div>
@@ -57,12 +65,20 @@ export function Footer() {
 
         <div className="mt-6 border-t border-border/60 pt-6 text-center text-sm">
           <p className="inline-flex items-center justify-center gap-2 text-muted-foreground">
+<<<<<<< HEAD
             <Sparkles className="h-4 w-4 text-primary" />
             Developed by{" "}
             <strong className="text-foreground">
               Madina Tul Karim Nomal Scouts
             </strong>{" "}
             with AI
+=======
+            <Code className="h-4 w-4 text-primary" />
+            Web developed by{" "}
+            <strong className="text-foreground">
+              Madina Tul Karim Nomal JK
+            </strong>
+>>>>>>> a5a7e01694ee185bfa01efef2f0230eb233ff9cd
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
             &copy; {new Date().getFullYear()} AKLEB STEM &amp; Robotics · AI
