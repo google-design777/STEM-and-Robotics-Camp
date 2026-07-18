@@ -115,7 +115,14 @@ That's it. Every registration will now appear as a new row in your Google Sheet 
 
 ## 2. Deploy to Vercel (free tier)
 
-### Step 1 — Push the code to GitHub
+### Step 1 — Unzip the project locally
+
+```bash
+unzip akleb-ai-camp-portal.zip
+cd akleb-ai-camp-portal
+```
+
+### Step 2 — Push the code to GitHub
 
 1. Create a new GitHub repository (e.g. `akleb-ai-camp`).
 2. Push the project to it:
@@ -129,15 +136,16 @@ git remote add origin https://github.com/<your-username>/akleb-ai-camp.git
 git push -u origin main
 ```
 
-### Step 2 — Import into Vercel
+### Step 3 — Import into Vercel
 
 1. Go to <https://vercel.com> and sign in with GitHub.
 2. Click **Add New → Project**.
 3. Select your `akleb-ai-camp` repository.
 4. Vercel auto-detects Next.js — keep the defaults:
    - Framework preset: **Next.js**
-   - Build command: `next build` (auto)
+   - Build command: `next build` (the `package.json` already has this — don't override it)
    - Output directory: `.next` (auto)
+   - Install command: leave as `npm install` (the project includes `package-lock.json`)
 5. Open **Environment Variables** and add:
 
    | Name | Value |
@@ -146,7 +154,7 @@ git push -u origin main
 
 6. Click **Deploy**. The first deploy takes ~2 minutes.
 
-### Step 3 — Open your live site
+### Step 4 — Open your live site
 
 After deployment, Vercel gives you a URL like `https://akleb-ai-camp.vercel.app`. Test it by submitting a registration — within seconds a new row should appear in your Google Sheet.
 
@@ -179,6 +187,21 @@ If you ever change the Sheet columns (add/remove), also update the `row` array i
 ---
 
 ## 5. Troubleshooting
+
+### "Vercel deployment failed"
+
+The most common cause is a custom `build` script that tries to copy files into a `.next/standalone/` directory — that worked locally but breaks on Vercel's serverless filesystem. The latest version of this project has a clean `build: "next build"` script in `package.json`, no `output: "standalone"` in `next.config.ts`, and a `vercel.json` that pins the framework to Next.js. If you're upgrading from an earlier version, replace these three files (`package.json`, `next.config.ts`, `vercel.json`) with the latest ones from the zip and redeploy.
+
+Other common causes:
+- **`prisma generate` not running** — fixed by the `postinstall` script in `package.json`. If you removed it, run `npx prisma generate` before `next build`.
+- **Node version mismatch** — the `.nvmrc` file pins Node 20. If Vercel is using a different version, set the override in Project Settings → General → Node.js Version.
+- **A dependency failed to install** — check the build logs for `npm ERR!`. Usually a typo in `package.json` or an unsupported package.
+
+To see the full build log, run from your terminal:
+```bash
+npx vercel login            # one-time, if not logged in
+npx vercel inspect <deployment-id> --logs
+```
 
 ### "Every submission gets the same ID (e.g. #001)"
 

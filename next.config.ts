@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
-  /* config options here */
+  // Vercel handles Next.js natively — no need for `output: "standalone"`.
+  // (standalone mode was breaking the Vercel build because the custom `cp` commands
+  // in the build script assumed a local filesystem layout that Vercel doesn't have.)
   typescript: {
     ignoreBuildErrors: true,
   },
