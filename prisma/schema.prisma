@@ -1,0 +1,26 @@
+// AKLEB STEM & Robotics Camp — AI Literacy Registration
+// Backup storage for registrations. Primary storage is the connected Google Sheet.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Registration {
+  id        Int      @id @default(autoincrement())
+  sno       Int      @default(0) // mirrored SNO for Google Sheet
+  name      String
+  gender    String
+  age       Int
+  class     String
+  whatsapp  String
+  jkName    String   @default("Madina Tul Karim Nomal")
+  school    String
+  createdAt DateTime @default(now())
+
+  @@map("registrations")
+}
