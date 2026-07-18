@@ -60,7 +60,7 @@ export function Footer() {
             <Sparkles className="h-4 w-4 text-primary" />
             Developed by{" "}
             <strong className="text-foreground">
-              Madina Tul Karim Nomal Scouts
+              Madina Tul Karim Nomal JK Scouts
             </strong>{" "}
             with AI
           </p>
